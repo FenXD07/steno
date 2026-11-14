@@ -1,0 +1,69 @@
+name: Steno Sort & Deploy
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "steno-pages"
+  cancel-in-progress: false
+
+jobs:
+  sort-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Gemini AI auto-sorter & indexer
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node .github/scripts/sort-and-index.mjs
+
+      - name: Commit sorted files & updated manifest
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "steno-bot"
+            git config user.email "steno-bot@users.noreply.github.com"
+            git add -A
+            git commit -m "chore(steno): auto-sort and index documents [skip ci]"
+            git push
+          else
+            echo "No new files to sort."
+          fi
+
+      - name: Build Steno site
+        run: |
+          npm run build
+          mkdir -p dist/documents
+          cp -r documents/. dist/documents/
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

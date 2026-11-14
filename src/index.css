@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #F7F5EE;
+  --color-paper: #FFFFFF;
+  --color-paper-warm: #F1EFE6;
+  --color-ink: #233329;
+  --color-ink-muted: #5A6B60;
+  --color-mint: #7FA195;
+  --color-mint-soft: #E5EFEA;
+  --color-terracotta: #C1664B;
+  --color-terracotta-soft: #F7E8E3;
+  --color-rule: #E2DED2;
+
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-ivory);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    background-image: radial-gradient(#D9D4C5 1px, transparent 1px);
+    background-size: 22px 22px;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Vintage paper prose styling for Markdown previews */
+.steno-prose h1,
+.steno-prose h2,
+.steno-prose h3 {
+  font-family: var(--font-serif);
+  color: var(--color-ink);
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+.steno-prose h1 { font-size: 2rem; border-bottom: 1px solid var(--color-rule); padding-bottom: 0.3rem; }
+.steno-prose h2 { font-size: 1.5rem; }
+.steno-prose h3 { font-size: 1.25rem; }
+.steno-prose p, .steno-prose li { line-height: 1.7; margin-bottom: 0.75rem; color: #2D3D33; }
+.steno-prose ul, .steno-prose ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+.steno-prose ul { list-style-type: disc; }
+.steno-prose ol { list-style-type: decimal; }
+.steno-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--color-paper-warm);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+.steno-prose pre {
+  background: var(--color-ink);
+  color: var(--color-ivory);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.steno-prose pre code { background: transparent; padding: 0; color: inherit; }
+.steno-prose blockquote {
+  border-left: 3px solid var(--color-mint);
+  padding-left: 1rem;
+  color: var(--color-ink-muted);
+  font-style: italic;
+  margin: 1rem 0;
+}

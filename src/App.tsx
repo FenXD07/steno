@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Lock, Menu, Search, Unlock, Upload, X } from 'lucide-react';
+import { Bot, Lock, Menu, Search, Unlock, Upload, X } from 'lucide-react';
 import type { FolderNode, OwnerConfig, StenoDocument, StenoManifest } from './types';
 import { Sidebar } from './components/Sidebar';
 import { DocumentList } from './components/DocumentList';
 import { DocumentViewer } from './components/DocumentViewer';
 import { OwnerModal } from './components/OwnerModal';
+import { AgentRoomModal } from './components/AgentRoomModal';
 
 const OWNER_STORAGE_KEY = 'steno_owner_config_v1';
 
@@ -54,6 +55,7 @@ export default function App() {
     }
   });
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [agentRoomOpen, setAgentRoomOpen] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -199,6 +201,16 @@ export default function App() {
 
             <button
               type="button"
+              onClick={() => setAgentRoomOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-rule bg-paper text-ink-muted hover:text-ink hover:bg-paper-warm transition-colors shrink-0"
+              title="Open Steno Agent Room"
+            >
+              <Bot className="w-3.5 h-3.5 text-mint" />
+              <span className="hidden sm:inline">Agents</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setOwnerModalOpen(true)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shrink-0 ${
                 ownerConfig
@@ -262,6 +274,12 @@ export default function App() {
         onClose={() => setOwnerModalOpen(false)}
         ownerConfig={ownerConfig}
         onSaveConfig={handleSaveOwnerConfig}
+      />
+      <AgentRoomModal
+        open={agentRoomOpen}
+        onClose={() => setAgentRoomOpen(false)}
+        ownerConfig={ownerConfig}
+        documents={manifest.documents}
       />
     </div>
   );

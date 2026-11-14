@@ -6,6 +6,7 @@ const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, 'inbox');
 const DOCS_DIR = path.join(ROOT, 'documents');
 const MANIFEST_PATH = path.join(ROOT, 'public', 'manifest.json');
+const AGENT_LOG_PATH = path.join(ROOT, 'public', 'agent-log.json');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -38,7 +39,7 @@ function walkFiles(dir, baseDir = dir) {
   if (!fs.existsSync(dir)) return [];
   const results = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name.startsWith('.')) continue; // skips .gitkeep, .DS_Store
+    if (entry.name.startsWith('.')) continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...walkFiles(fullPath, baseDir));
@@ -72,7 +73,7 @@ function sanitizeFolder(folder) {
     .split('/')
     .map((seg) => seg.replace(/[<>:"|?*\x00-\x1f]/g, '').trim())
     .filter((seg) => seg && seg !== '.' && seg !== '..')
-    .slice(0, 3)
+    .slice(0, 4)
     .join('/');
   return cleaned || 'Unsorted';
 }
@@ -142,18 +143,19 @@ Instructions:
 2. Provide a clean, human-readable "title" (no file extension).
 3. Provide 1 to 4 lowercase hyphenated "tags" (e.g. "lecture-notes", "syllabus", "exam-prep", "lab", "slides", "reading"). Prefer reusing existing tags when relevant.
 4. Provide a concise 1-sentence "summary" describing what the document contains.
+5. Provide a short 1-sentence "reason" explaining why you chose that folder/tags.
 
 Return ONLY valid JSON matching:
 {
   "folder": "string",
   "title": "string",
   "tags": ["string"],
-  "summary": "string"
+  "summary": "string",
+  "reason": "string"
 }`;
 
   parts.push({ text: prompt });
 
-  // Attach file content for Gemini
   if (MULTIMODAL_EXTS.has(ext) && stat.size <= 18 * 1024 * 1024) {
     const base64 = fs.readFileSync(filePath).toString('base64');
     parts.push({
@@ -202,6 +204,7 @@ Return ONLY valid JSON matching:
       title: String(parsed.title || fallbackTitle(filename)).trim(),
       tags: sanitizeTags(parsed.tags),
       summary: String(parsed.summary || '').trim(),
+      reason: String(parsed.reason || '').trim(),
     };
   } catch (err) {
     console.warn(`Gemini parsing failed for ${filename}:`, err.message);
@@ -231,6 +234,7 @@ function removeEmptyDirs(dir, stopAt) {
 }
 
 async function main() {
+  const runStart = Date.now();
   ensureDir(INBOX_DIR);
   ensureDir(DOCS_DIR);
   ensureDir(path.dirname(MANIFEST_PATH));
@@ -254,12 +258,15 @@ async function main() {
     for (const t of doc.tags || []) existingTagsSet.add(t);
   }
 
+  const runEvents = [];
+
   // 1. Process new files in inbox/
   const inboxFiles = walkFiles(INBOX_DIR);
   const newlySortedMeta = new Map();
 
   for (const item of inboxFiles) {
     const filename = path.basename(item.fullPath);
+    const fileStart = Date.now();
     console.log(`Sorting inbox file: ${item.relPath}`);
 
     const ai = await askGemini(
@@ -287,6 +294,17 @@ async function main() {
       summary: ai?.summary || '',
     });
 
+    runEvents.push({
+      file: filename,
+      title: ai?.title || fallbackTitle(filename),
+      source: 'inbox',
+      folder: targetFolder,
+      tags: ai?.tags || [],
+      reason: ai?.reason || (ai ? 'Sorted by Gemini AI' : 'Fallback sort (no AI response)'),
+      durationMs: Date.now() - fileStart,
+      at: new Date().toISOString(),
+    });
+
     console.log(` -> Moved to ${manifestRelPath}`);
   }
 
@@ -304,8 +322,8 @@ async function main() {
 
     let meta = newlySortedMeta.get(manifestRelPath) || prevByPath.get(manifestRelPath);
 
-    // If user manually added a file directly into documents/, ask Gemini for tags/summary (keeping its folder)
     if (!meta) {
+      const fileStart = Date.now();
       console.log(`Indexing manually added file: ${manifestRelPath}`);
       const ai = await askGemini(
         item.fullPath,
@@ -320,6 +338,17 @@ async function main() {
         summary: ai?.summary || '',
       };
       for (const t of meta.tags) existingTagsSet.add(t);
+
+      runEvents.push({
+        file: filename,
+        title: meta.title,
+        source: 'manual',
+        folder,
+        tags: meta.tags,
+        reason: ai?.reason || (ai ? 'Tagged & summarized by Gemini AI' : 'Indexed by filename'),
+        durationMs: Date.now() - fileStart,
+        at: new Date().toISOString(),
+      });
     }
 
     documents.push({
@@ -336,7 +365,6 @@ async function main() {
     });
   }
 
-  // Sort newest first
   documents.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
 
   fs.writeFileSync(
@@ -351,6 +379,23 @@ async function main() {
     )
   );
 
+  // Only overwrite agent-log.json if new files were processed (or if log doesn't exist yet)
+  if (runEvents.length > 0 || !fs.existsSync(AGENT_LOG_PATH)) {
+    fs.writeFileSync(
+      AGENT_LOG_PATH,
+      JSON.stringify(
+        {
+          runAt: new Date().toISOString(),
+          durationMs: Date.now() - runStart,
+          processedCount: runEvents.length,
+          events: runEvents.slice(0, 30),
+        },
+        null,
+        2
+      )
+    );
+  }
+
   console.log(`Indexed ${documents.length} total document(s).`);
 }
 
@@ -358,3 +403,6 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+Bạn lưu 2 file trên xong báo mình để mình gửi Phần B: Giao diện Agent Room (nhân
+vật đi lại + live GitHub Actions) nhé!

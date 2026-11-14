@@ -29,3 +29,21 @@ export interface OwnerConfig {
   branch: string;
   token: string;
 }
+
+export interface AgentEvent {
+  file: string;
+  title: string;
+  source: 'inbox' | 'manual';
+  folder: string;
+  tags: string[];
+  reason: string;
+  durationMs: number;
+  at: string;
+}
+
+export interface AgentLog {
+  runAt: string;
+  durationMs: number;
+  processedCount: number;
+  events: AgentEvent[];
+}

@@ -68,3 +68,12 @@
   font-style: italic;
   margin: 1rem 0;
 }
+
+@keyframes agent-bob {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.agent-walking {
+  animation: agent-bob 0.38s ease-in-out infinite;
+}

@@ -4,6 +4,12 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      retry_fallbacks:
+        description: Retry documents previously indexed in Unsorted without AI metadata
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -33,6 +39,7 @@ jobs:
       - name: Run Gemini AI auto-sorter & indexer
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RETRY_FALLBACKS: ${{ github.event.inputs.retry_fallbacks || 'false' }}
         run: node .github/scripts/sort-and-index.mjs
 
       - name: Commit sorted files & updated manifest

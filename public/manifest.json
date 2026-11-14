@@ -1,6 +1,70 @@
 {
-  "generatedAt": "2026-11-14T10:09:05.823Z",
+  "generatedAt": "2026-11-14T10:29:38.409Z",
   "documents": [
+    {
+      "id": "documents/Electrical Engineering/LDO.pdf",
+      "path": "documents/Electrical Engineering/LDO.pdf",
+      "filename": "LDO.pdf",
+      "folder": "Electrical Engineering",
+      "title": "Low-Dropout Regulators (LDO)",
+      "tags": [
+        "electronics",
+        "hardware",
+        "lecture-notes"
+      ],
+      "summary": "An instructional document exploring the principles, operation, and circuit design of low-dropout voltage regulators.",
+      "ext": "pdf",
+      "size": 29028007,
+      "addedAt": "2026-11-14T10:26:01.516Z"
+    },
+    {
+      "id": "documents/Electrical Engineering/DC_DC.pdf",
+      "path": "documents/Electrical Engineering/DC_DC.pdf",
+      "filename": "DC_DC.pdf",
+      "folder": "Electrical Engineering",
+      "title": "DC-DC Converters",
+      "tags": [
+        "electronics",
+        "hardware",
+        "lecture-notes"
+      ],
+      "summary": "An educational guide on the principles, topologies, and operation of DC-DC power converters.",
+      "ext": "pdf",
+      "size": 40255376,
+      "addedAt": "2026-11-14T10:26:01.390Z"
+    },
+    {
+      "id": "documents/Electrical Engineering/ADC_RF.pdf",
+      "path": "documents/Electrical Engineering/ADC_RF.pdf",
+      "filename": "ADC_RF.pdf",
+      "folder": "Electrical Engineering",
+      "title": "Analog-to-Digital Converters and Radio Frequency",
+      "tags": [
+        "electronics",
+        "hardware",
+        "lecture-notes"
+      ],
+      "summary": "This document covers foundational principles and circuit design concepts for analog-to-digital converters and radio frequency applications.",
+      "ext": "pdf",
+      "size": 21635004,
+      "addedAt": "2026-11-14T10:26:01.214Z"
+    },
+    {
+      "id": "documents/Electrical Engineering/ADCBMIC.pdf",
+      "path": "documents/Electrical Engineering/ADCBMIC.pdf",
+      "filename": "ADCBMIC.pdf",
+      "folder": "Electrical Engineering",
+      "title": "ADC and BMIC Overview",
+      "tags": [
+        "lecture-notes",
+        "electronics",
+        "hardware"
+      ],
+      "summary": "This document covers technical principles and design fundamentals related to Analog-to-Digital Converters (ADC) and Battery Management Integrated Circuits (BMIC).",
+      "ext": "pdf",
+      "size": 33985784,
+      "addedAt": "2026-11-14T10:26:01.120Z"
+    },
     {
       "id": "documents/Unsorted/PLL.pdf",
       "path": "documents/Unsorted/PLL.pdf",
@@ -12,54 +76,6 @@
       "ext": "pdf",
       "size": 28932268,
       "addedAt": "2026-11-14T10:09:00.357Z"
-    },
-    {
-      "id": "documents/Unsorted/LDO.pdf",
-      "path": "documents/Unsorted/LDO.pdf",
-      "filename": "LDO.pdf",
-      "folder": "Unsorted",
-      "title": "LDO",
-      "tags": [],
-      "summary": "",
-      "ext": "pdf",
-      "size": 29028007,
-      "addedAt": "2026-11-14T10:09:00.234Z"
-    },
-    {
-      "id": "documents/Unsorted/DC_DC.pdf",
-      "path": "documents/Unsorted/DC_DC.pdf",
-      "filename": "DC_DC.pdf",
-      "folder": "Unsorted",
-      "title": "DC DC",
-      "tags": [],
-      "summary": "",
-      "ext": "pdf",
-      "size": 40255376,
-      "addedAt": "2026-11-14T10:09:00.110Z"
-    },
-    {
-      "id": "documents/Unsorted/ADCBMIC.pdf",
-      "path": "documents/Unsorted/ADCBMIC.pdf",
-      "filename": "ADCBMIC.pdf",
-      "folder": "Unsorted",
-      "title": "ADCBMIC",
-      "tags": [],
-      "summary": "",
-      "ext": "pdf",
-      "size": 33985784,
-      "addedAt": "2026-11-14T10:08:59.943Z"
-    },
-    {
-      "id": "documents/Unsorted/ADC_RF.pdf",
-      "path": "documents/Unsorted/ADC_RF.pdf",
-      "filename": "ADC_RF.pdf",
-      "folder": "Unsorted",
-      "title": "ADC RF",
-      "tags": [],
-      "summary": "",
-      "ext": "pdf",
-      "size": 21635004,
-      "addedAt": "2026-11-14T09:31:20.382Z"
     }
   ]
 }

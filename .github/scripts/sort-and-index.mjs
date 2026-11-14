@@ -403,6 +403,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
-Bạn lưu 2 file trên xong báo mình để mình gửi Phần B: Giao diện Agent Room (nhân
-vật đi lại + live GitHub Actions) nhé!

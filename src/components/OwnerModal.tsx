@@ -16,6 +16,8 @@ interface OwnerModalProps {
   onClose: () => void;
   ownerConfig: OwnerConfig | null;
   onSaveConfig: (config: OwnerConfig | null) => void;
+  onUploaded?: (filenames: string[]) => void;
+  onOpenAgents?: () => void;
 }
 
 interface UploadItem {
@@ -56,6 +58,8 @@ export function OwnerModal({
   onClose,
   ownerConfig,
   onSaveConfig,
+  onUploaded,
+  onOpenAgents,
 }: OwnerModalProps) {
   const guessed = guessGitHubRepo();
   const [owner, setOwner] = useState(ownerConfig?.owner || guessed.owner);
@@ -153,7 +157,7 @@ export function OwnerModal({
       'Content-Type': 'application/json',
     };
 
-    const uploadedBlobs: Array<{ idx: number; path: string; sha: string }> = [];
+    const uploadedBlobs: Array<{ idx: number; name: string; path: string; sha: string }> = [];
 
     // 1. Upload each file as a Git Blob (supports up to ~95 MB)
     for (let i = 0; i < list.length; i++) {
@@ -186,11 +190,7 @@ export function OwnerModal({
 
         const blobData = await blobRes.json();
         const safeName = file.name.replace(/[/\\]/g, '_');
-        uploadedBlobs.push({
-          idx: i,
-          path: `inbox/${safeName}`,
-          sha: blobData.sha,
-        });
+        uploadedBlobs.push({ idx: i, name: safeName, path: `inbox/${safeName}`, sha: blobData.sha });
 
         setQueue((prev) =>
           prev.map((item, idx) =>
@@ -280,6 +280,7 @@ export function OwnerModal({
         setCommitStatus(
           `Committed ${uploadedBlobs.length} file(s)! Open the Agents room to watch Gemini sort them live.`
         );
+        onUploaded?.(uploadedBlobs.map((b) => b.name));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Commit failed';
         setCommitError(msg);
@@ -486,6 +487,18 @@ export function OwnerModal({
                 </p>
               )}
 
+              {commitStatus.startsWith('Committed ') && onOpenAgents && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAgents();
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-ink text-ivory py-2 rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
+                >
+                  Watch 3D Agents Sort Live →
+                </button>
+              )}
               {commitError && (
                 <p className="text-[11px] font-mono text-terracotta bg-terracotta-soft border border-terracotta/30 rounded-lg px-3 py-2">
                   {commitError}

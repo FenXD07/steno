@@ -272,9 +272,11 @@ async function main() {
 
   // 1. Process new files in inbox/
   // Requeue files that were previously indexed in Unsorted without AI metadata.
-  const fallbackItems = walkFiles(DOCS_DIR).filter((item) =>
-    fallbackMetaPaths.has(`documents/${item.relPath}`)
-  );
+  const fallbackItems = process.env.RETRY_FALLBACKS === 'true'
+    ? walkFiles(DOCS_DIR).filter((item) =>
+        fallbackMetaPaths.has(`documents/${item.relPath}`)
+      )
+    : [];
   for (const item of fallbackItems) {
     const filename = path.basename(item.fullPath);
     const retryPath = getUniqueDestPath(INBOX_DIR, filename);

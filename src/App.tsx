@@ -56,6 +56,7 @@ export default function App() {
   });
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
   const [agentRoomOpen, setAgentRoomOpen] = useState(false);
+  const [pendingDrop, setPendingDrop] = useState<{ seq: number; files: string[] } | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -274,12 +275,15 @@ export default function App() {
         onClose={() => setOwnerModalOpen(false)}
         ownerConfig={ownerConfig}
         onSaveConfig={handleSaveOwnerConfig}
+        onUploaded={(files) => setPendingDrop((prev) => ({ seq: (prev?.seq || 0) + 1, files }))}
+        onOpenAgents={() => setAgentRoomOpen(true)}
       />
       <AgentRoomModal
         open={agentRoomOpen}
         onClose={() => setAgentRoomOpen(false)}
         ownerConfig={ownerConfig}
         documents={manifest.documents}
+        pendingDrop={pendingDrop}
       />
     </div>
   );

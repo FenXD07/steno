@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  Archive,
+  Camera,
   CheckCircle2,
-  Inbox,
+  FastForward,
   Loader2,
+  PackagePlus,
   Play,
   Radio,
   RefreshCw,
-  Search,
-  Sparkles,
   Square,
   X,
 } from 'lucide-react';
 import type { AgentEvent, AgentLog, OwnerConfig, StenoDocument } from '../types';
+import type { CameraPreset, LiveWorkflowStage, PipelineJob, PipelinePhase } from './AgentRoom3DCanvas';
+
+const AgentRoom3DCanvas = lazy(() =>
+  import('./AgentRoom3DCanvas').then((module) => ({ default: module.AgentRoom3DCanvas }))
+);
 
 interface AgentRoomModalProps {
   open: boolean;
   onClose: () => void;
   ownerConfig: OwnerConfig | null;
   documents: StenoDocument[];
+  pendingDrop?: { seq: number; files: string[] } | null;
 }
 
 interface GitHubRunInfo {
@@ -31,7 +36,18 @@ interface GitHubRunInfo {
   activeStepName?: string;
 }
 
-type AgentId = 'courier' | 'archivist' | 'librarian';
+const STEP_LABELS: Array<{ id: string; label: string; phases: PipelinePhase[] }> = [
+  { id: 'drop', label: '1. Drop', phases: ['dropping'] },
+  { id: 'courier', label: '2. Courier', phases: ['courier_to_inbox', 'courier_to_github'] },
+  { id: 'github', label: '3. GitHub', phases: ['github_sync', 'gemini_to_github'] },
+  { id: 'desk', label: '4. Desk', phases: ['gemini_to_desk'] },
+  { id: 'scan', label: '5. AI Scan', phases: ['ai_processing'] },
+  {
+    id: 'shelf',
+    label: '6. Shelved',
+    phases: ['librarian_to_desk', 'librarian_to_shelf', 'shelving_and_stamp', 'return_idle'],
+  },
+];
 
 function detectRepo(ownerConfig: OwnerConfig | null): { owner: string; repo: string } {
   if (ownerConfig?.owner && ownerConfig?.repo) {
@@ -46,99 +62,12 @@ function detectRepo(ownerConfig: OwnerConfig | null): { owner: string; repo: str
   return { owner: 'FenXD07', repo: 'steno' };
 }
 
-function AgentSprite({
-  id,
-  walking,
-  active,
-  bubble,
-}: {
-  id: AgentId;
-  walking: boolean;
-  active: boolean;
-  bubble?: string;
-}) {
-  const meta = {
-    courier: { name: 'Courier', color: '#C1664B', bg: '#F7E8E3' },
-    archivist: { name: 'Gemini', color: '#5D8A7B', bg: '#E5EFEA' },
-    librarian: { name: 'Librarian', color: '#233329', bg: '#EAE6DA' },
-  }[id];
-
-  return (
-    <div className="relative flex flex-col items-center select-none">
-      {/* Speech Bubble */}
-      {bubble && (
-        <div className="mb-2 px-2.5 py-1 rounded-lg bg-paper border border-rule shadow-sm text-[11px] font-mono text-ink whitespace-nowrap max-w-[190px] truncate animate-fade-in">
-          {bubble}
-        </div>
-      )}
-
-      {/* Cute Retro Character SVG */}
-      <div className={walking ? 'agent-walking' : ''}>
-        <svg
-          width="42"
-          height="46"
-          viewBox="0 0 42 46"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className={`drop-shadow-xs transition-transform ${active ? 'scale-110' : 'scale-100 opacity-90'}`}
-        >
-          {/* Shadow */}
-          <ellipse cx="21" cy="43" rx="11" ry="2.5" fill="#233329" fillOpacity="0.14" />
-          {/* Legs */}
-          <rect x="15" y="34" width="4" height="7" rx="2" fill="#233329" />
-          <rect x="23" y="34" width="4" height="7" rx="2" fill="#233329" />
-          {/* Body */}
-          <rect x="11" y="20" width="20" height="16" rx="6" fill={meta.color} />
-          {/* Head */}
-          <circle cx="21" cy="14" r="9" fill="#FBF8F1" stroke="#233329" strokeWidth="1.8" />
-          {/* Eyes */}
-          <circle cx="18" cy="13.5" r="1.3" fill="#233329" />
-          <circle cx="24" cy="13.5" r="1.3" fill="#233329" />
-          {/* Role accessory */}
-          {id === 'courier' && (
-            <>
-              {/* Cap */}
-              <path d="M13 10C13 6.5 16.5 4.5 21 4.5C25.5 4.5 29 6.5 29 10H13Z" fill="#C1664B" stroke="#233329" strokeWidth="1.5" />
-              {/* Paper */}
-              <rect x="27" y="22" width="8" height="10" rx="1.5" fill="#FFFFFF" stroke="#233329" strokeWidth="1.3" />
-            </>
-          )}
-          {id === 'archivist' && (
-            <>
-              {/* Glasses */}
-              <circle cx="18" cy="13.5" r="3" stroke="#233329" strokeWidth="1.2" />
-              <circle cx="24" cy="13.5" r="3" stroke="#233329" strokeWidth="1.2" />
-              <line x1="21" y1="13.5" x2="21.2" y2="13.5" stroke="#233329" strokeWidth="1.2" />
-              {/* Sparkle badge */}
-              <circle cx="21" cy="27" r="3" fill="#F7F5EE" />
-            </>
-          )}
-          {id === 'librarian' && (
-            <>
-              {/* Book */}
-              <rect x="6" y="22" width="8" height="10" rx="1.5" fill="#7FA195" stroke="#233329" strokeWidth="1.3" />
-              <line x1="8.5" y1="24" x2="8.5" y2="30" stroke="#F7F5EE" strokeWidth="1.2" />
-            </>
-          )}
-        </svg>
-      </div>
-
-      {/* Nameplate */}
-      <span
-        className="mt-1 px-2 py-0.5 rounded-full font-mono text-[10px] border border-rule/80"
-        style={{ backgroundColor: meta.bg, color: '#233329' }}
-      >
-        {meta.name}
-      </span>
-    </div>
-  );
-}
-
 export function AgentRoomModal({
   open,
   onClose,
   ownerConfig,
   documents,
+  pendingDrop,
 }: AgentRoomModalProps) {
   const { owner, repo } = useMemo(() => detectRepo(ownerConfig), [ownerConfig]);
   const [agentLog, setAgentLog] = useState<AgentLog | null>(null);
@@ -146,21 +75,17 @@ export function AgentRoomModal({
   const [pollingError, setPollingError] = useState('');
   const [loadingStatus, setLoadingStatus] = useState(false);
 
-  // Agent positions in % along the room floor (12%, 38%, 64%, 88%)
-  const [positions, setPositions] = useState<Record<AgentId, number>>({
-    courier: 12,
-    archivist: 64,
-    librarian: 88,
+  const [dropBatch, setDropBatch] = useState<{ seq: number; jobs: PipelineJob[] } | null>(null);
+  const [stopSeq, setStopSeq] = useState(0);
+  const [speed, setSpeed] = useState<1 | 2>(1);
+  const [cameraPreset, setCameraPreset] = useState<{ seq: number; preset: CameraPreset }>({
+    seq: 0,
+    preset: 'iso',
   });
-  const [walking, setWalking] = useState<Record<AgentId, boolean>>({
-    courier: false,
-    archivist: false,
-    librarian: false,
-  });
-  const [bubbles, setBubbles] = useState<Partial<Record<AgentId, string>>>({});
-  const [activeAgent, setActiveAgent] = useState<AgentId | null>(null);
-  const [replaying, setReplaying] = useState(false);
-  const replayAbortRef = useRef(false);
+  const [activePhase, setActivePhase] = useState<PipelinePhase>('idle');
+  const [activeJob, setActiveJob] = useState<PipelineJob | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
+  const [lastConsumedDropSeq, setLastConsumedDropSeq] = useState(0);
 
   const loadAgentLog = useCallback(async () => {
     try {
@@ -213,8 +138,12 @@ export function AgentRoomModal({
         );
         if (jobsRes.ok) {
           const jobsData = await jobsRes.json();
-          const currentJob = jobsData?.jobs?.find((j: { status: string }) => j.status !== 'completed');
-          const currentStep = currentJob?.steps?.find((s: { status: string }) => s.status === 'in_progress');
+          const currentJob = jobsData?.jobs?.find(
+            (j: { status: string }) => j.status !== 'completed'
+          );
+          const currentStep = currentJob?.steps?.find(
+            (s: { status: string }) => s.status === 'in_progress'
+          );
           activeStepName = currentStep?.name || currentJob?.name || '';
         }
       }
@@ -234,7 +163,6 @@ export function AgentRoomModal({
     }
   }, [owner, repo, ownerConfig]);
 
-  // Load log & poll GitHub Actions when modal opens
   useEffect(() => {
     if (!open) return;
     loadAgentLog();
@@ -247,161 +175,133 @@ export function AgentRoomModal({
     return () => clearInterval(interval);
   }, [open, loadAgentLog, fetchGitHubStatus]);
 
-  // Move agents dynamically based on real GitHub Actions progress (when not replaying)
+  // Trigger 3D drop automatically when OwnerModal uploads files
   useEffect(() => {
-    if (!open || replaying || !runInfo) return;
+    if (!open || !pendingDrop || pendingDrop.seq <= lastConsumedDropSeq) return;
+    setLastConsumedDropSeq(pendingDrop.seq);
+    const jobs: PipelineJob[] = pendingDrop.files.map((filename, idx) => ({
+      id: `upload-${pendingDrop.seq}-${idx}`,
+      filename,
+      title: filename.replace(/\.[^/.]+$/, ''),
+      folder: 'Sorting via Gemini',
+      tags: ['inbox', 'ai-sort'],
+    }));
+    setDropBatch({ seq: Date.now(), jobs });
+  }, [open, pendingDrop, lastConsumedDropSeq]);
 
-    if (runInfo.status === 'completed') {
-      setPositions({ courier: 12, archivist: 64, librarian: 88 });
-      setWalking({ courier: false, archivist: false, librarian: false });
-      setActiveAgent(null);
-      setBubbles(
-        runInfo.conclusion === 'success'
-          ? { librarian: 'Archive up to date!' }
-          : { archivist: `Run ended: ${runInfo.conclusion}` }
-      );
-      loadAgentLog();
-      return;
+  // Reset queue when modal closes
+  useEffect(() => {
+    if (!open) {
+      setStopSeq((s) => s + 1);
     }
+  }, [open]);
 
-    const step = (runInfo.activeStepName || '').toLowerCase();
-    if (step.includes('gemini') || step.includes('sort')) {
-      setPositions({ courier: 38, archivist: 64, librarian: 88 });
-      setWalking({ courier: false, archivist: true, librarian: false });
-      setActiveAgent('archivist');
-      setBubbles({ archivist: 'Gemini is reading & tagging…' });
-    } else if (step.includes('commit') || step.includes('build') || step.includes('deploy')) {
-      setPositions({ courier: 12, archivist: 64, librarian: 88 });
-      setWalking({ courier: false, archivist: false, librarian: true });
-      setActiveAgent('librarian');
-      setBubbles({ librarian: `Publishing (${runInfo.activeStepName || 'deploy'})…` });
-    } else {
-      setPositions({ courier: 38, archivist: 38, librarian: 88 });
-      setWalking({ courier: true, archivist: false, librarian: false });
-      setActiveAgent('courier');
-      setBubbles({ courier: `Fetching inbox (${runInfo.activeStepName || 'queued'})…` });
-    }
-  }, [open, replaying, runInfo, loadAgentLog]);
+  const handleStateChange = useCallback(
+    (info: { phase: PipelinePhase; currentJob: PipelineJob | null; queueCount: number }) => {
+      setActivePhase(info.phase);
+      setActiveJob(info.currentJob);
+      setQueueCount(info.queueCount);
+    },
+    []
+  );
 
-  const stopReplay = () => {
-    replayAbortRef.current = true;
-    setReplaying(false);
-    setWalking({ courier: false, archivist: false, librarian: false });
-    setActiveAgent(null);
+  const handleDropTest = () => {
+    const sampleDoc = documents[Math.floor(Math.random() * Math.max(1, documents.length))];
+    const job: PipelineJob = sampleDoc
+      ? {
+          id: `test-${Date.now()}`,
+          filename: sampleDoc.filename,
+          title: sampleDoc.title,
+          folder: sampleDoc.folder,
+          tags: sampleDoc.tags,
+          reason: sampleDoc.summary,
+        }
+      : {
+          id: `test-${Date.now()}`,
+          filename: 'PLL_Notes.pdf',
+          title: 'Phase-Locked Loop Notes',
+          folder: 'Analog/PLL',
+          tags: ['pll', 'circuit'],
+        };
+    setDropBatch({ seq: Date.now(), jobs: [job] });
   };
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  const startReplay = async () => {
-    if (replaying) {
-      stopReplay();
+  const handleReplay = () => {
+    if (activePhase !== 'idle') {
+      setStopSeq((s) => s + 1);
       return;
     }
 
-    // Use real events from agent-log.json, or fallback to latest docs as demo trace
-    const eventsToPlay: AgentEvent[] =
-      agentLog?.events?.length
-        ? agentLog.events.slice(0, 6)
-        : documents.slice(0, 3).map((d) => ({
-            file: d.filename,
-            title: d.title,
-            source: 'manual',
-            folder: d.folder,
-            tags: d.tags,
-            reason: d.summary || `Filed under ${d.folder}`,
-            durationMs: 900,
-            at: d.addedAt,
-          }));
+    const eventsToPlay: AgentEvent[] = agentLog?.events?.length
+      ? agentLog.events.slice(0, 5)
+      : documents.slice(0, 3).map((d) => ({
+          file: d.filename,
+          title: d.title,
+          source: 'manual',
+          folder: d.folder,
+          tags: d.tags,
+          reason: d.summary || `Filed under ${d.folder}`,
+          durationMs: 900,
+          at: d.addedAt,
+        }));
 
     if (eventsToPlay.length === 0) {
-      setBubbles({ archivist: 'Drop a doc in inbox/ first!' });
+      handleDropTest();
       return;
     }
 
-    replayAbortRef.current = false;
-    setReplaying(true);
-
-    for (const ev of eventsToPlay) {
-      if (replayAbortRef.current) break;
-
-      // Step 1: Courier picks up from Inbox -> brings to Reading Lamp
-      setActiveAgent('courier');
-      setWalking({ courier: true, archivist: false, librarian: false });
-      setPositions({ courier: 12, archivist: 64, librarian: 88 });
-      setBubbles({ courier: `Picked up ${ev.file}` });
-      await sleep(300);
-      if (replayAbortRef.current) break;
-      setPositions({ courier: 38, archivist: 64, librarian: 88 });
-      await sleep(1000);
-
-      // Step 2: Archivist walks to Reading Lamp -> Gemini Desk
-      if (replayAbortRef.current) break;
-      setActiveAgent('archivist');
-      setWalking({ courier: false, archivist: true, librarian: false });
-      setPositions({ courier: 12, archivist: 38, librarian: 88 });
-      setBubbles({ archivist: `Reading ${ev.file}…` });
-      await sleep(950);
-      if (replayAbortRef.current) break;
-      setPositions({ courier: 12, archivist: 64, librarian: 88 });
-      const tagPreview = ev.tags.length ? ` #${ev.tags[0]}` : '';
-      setBubbles({ archivist: `→ ${ev.folder}${tagPreview}` });
-      await sleep(1100);
-
-      // Step 3: Librarian walks from Gemini Desk -> Filing Cabinet
-      if (replayAbortRef.current) break;
-      setActiveAgent('librarian');
-      setWalking({ courier: false, archivist: false, librarian: true });
-      setPositions({ courier: 12, archivist: 64, librarian: 64 });
-      setBubbles({ librarian: `Filing "${ev.title}"…` });
-      await sleep(950);
-      if (replayAbortRef.current) break;
-      setPositions({ courier: 12, archivist: 64, librarian: 88 });
-      setBubbles({ librarian: `Saved in ${ev.folder}!` });
-      await sleep(950);
-    }
-
-    if (!replayAbortRef.current) {
-      setBubbles({ librarian: 'All done!' });
-    }
-    setWalking({ courier: false, archivist: false, librarian: false });
-    setActiveAgent(null);
-    setReplaying(false);
+    const jobs: PipelineJob[] = eventsToPlay.map((ev, idx) => ({
+      id: `replay-${Date.now()}-${idx}`,
+      filename: ev.file,
+      title: ev.title,
+      folder: ev.folder,
+      tags: ev.tags,
+      reason: ev.reason,
+    }));
+    setDropBatch({ seq: Date.now(), jobs });
   };
 
-  useEffect(() => {
-    if (!open) stopReplay();
-  }, [open]);
+  const liveStage: LiveWorkflowStage = useMemo(() => {
+    if (!runInfo || runInfo.status === 'completed') return 'idle';
+    const step = (runInfo.activeStepName || '').toLowerCase();
+    if (step.includes('gemini') || step.includes('sort')) return 'ai';
+    if (step.includes('commit') || step.includes('build') || step.includes('deploy')) {
+      return 'deploy';
+    }
+    return 'github';
+  }, [runInfo]);
 
   if (!open) return null;
 
   const isLiveRunning = runInfo && runInfo.status !== 'completed';
+  const isAnimating = activePhase !== 'idle';
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-6"
+      className="fixed inset-0 z-50 bg-ink/45 backdrop-blur-[2px] flex items-center justify-center p-2 sm:p-5"
       onClick={onClose}
     >
       <div
-        className="bg-paper border border-rule rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-paper border border-rule rounded-xl shadow-xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-rule bg-ivory/80 flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-4 sm:px-5 py-3.5 border-b border-rule bg-ivory/85 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-mint-soft border border-mint/40 flex items-center justify-center">
               <Activity className="w-4 h-4 text-ink" />
             </div>
             <div>
               <h2 className="font-serif text-2xl text-ink leading-none">
-                Steno Agent Room
+                Steno 3D Agent Room
               </h2>
               <p className="text-xs font-mono text-ink-muted mt-0.5">
-                {owner}/{repo} • Live GitHub Actions & Gemini Trace
+                {owner}/{repo} • Interactive 3D Sorting Pipeline
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {/* Live status pill */}
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[11px] border ${
@@ -424,10 +324,20 @@ export function AgentRoomModal({
 
             <button
               type="button"
-              onClick={startReplay}
+              onClick={handleDropTest}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-terracotta/40 bg-terracotta-soft text-terracotta hover:bg-terracotta hover:text-ivory transition-colors"
+              title="Drop 1 package down the 3D chute"
+            >
+              <PackagePlus className="w-3.5 h-3.5" />
+              <span>Drop Test</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReplay}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-ink text-ivory hover:opacity-90 transition-opacity"
             >
-              {replaying ? (
+              {isAnimating ? (
                 <>
                   <Square className="w-3 h-3" />
                   Stop
@@ -435,9 +345,23 @@ export function AgentRoomModal({
               ) : (
                 <>
                   <Play className="w-3 h-3" />
-                  Replay
+                  Replay Log
                 </>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSpeed((s) => (s === 1 ? 2 : 1))}
+              className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+                speed === 2
+                  ? 'bg-mint-soft border-mint text-ink'
+                  : 'bg-paper border-rule text-ink-muted hover:text-ink'
+              }`}
+              title="Toggle animation speed"
+            >
+              <FastForward className="w-3.5 h-3.5" />
+              {speed}x
             </button>
 
             <button
@@ -461,88 +385,71 @@ export function AgentRoomModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-ivory/40">
-          {/* Interactive Study Room Stage */}
-          <div className="relative bg-ivory border border-rule rounded-xl p-5 overflow-hidden shadow-xs">
-            {/* Subtle Floor Grid */}
-            <div
-              className="absolute inset-0 opacity-40 pointer-events-none"
-              style={{
-                backgroundImage:
-                  'linear-gradient(to right, #E2DED2 1px, transparent 1px), linear-gradient(to bottom, #E2DED2 1px, transparent 1px)',
-                backgroundSize: '28px 28px',
-              }}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-ivory/40">
+          {/* 3D Diorama Stage */}
+          <div className="space-y-2.5">
+            <Suspense fallback={<div className="h-[460px] rounded-xl bg-ivory border border-rule flex items-center justify-center text-sm text-ink-muted">Loading 3D room…</div>}>
+            <AgentRoom3DCanvas
+              dropBatch={dropBatch}
+              stopSeq={stopSeq}
+              speed={speed}
+              cameraPreset={cameraPreset}
+              liveStage={liveStage}
+              onStateChange={handleStateChange}
             />
+            </Suspense>
 
-            {/* 4 Stations */}
-            <div className="relative grid grid-cols-4 gap-2 text-center mb-10 pt-2">
-              <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-xl bg-paper border border-rule flex items-center justify-center shadow-xs">
-                  <Inbox className="w-5 h-5 text-terracotta" />
-                </div>
-                <span className="mt-1.5 font-mono text-[11px] font-medium text-ink">
-                  1. Inbox Tray
-                </span>
+            {/* Stepper + Camera Presets Bar */}
+            <div className="flex items-center justify-between gap-3 flex-wrap bg-paper border border-rule rounded-xl px-3.5 py-2.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {STEP_LABELS.map((step) => {
+                  const isCurrent = step.phases.includes(activePhase);
+                  return (
+                    <span
+                      key={step.id}
+                      className={`px-2 py-0.5 rounded-md font-mono text-[11px] border transition-colors ${
+                        isCurrent
+                          ? 'bg-ink text-ivory border-ink font-medium'
+                          : 'bg-ivory/70 text-ink-muted border-rule'
+                      }`}
+                    >
+                      {step.label}
+                    </span>
+                  );
+                })}
+                {activeJob && (
+                  <span className="ml-1 font-mono text-[11px] text-terracotta truncate max-w-[180px]">
+                    • {activeJob.filename}
+                    {queueCount > 0 ? ` (+${queueCount} queued)` : ''}
+                  </span>
+                )}
               </div>
 
-              <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-xl bg-paper border border-rule flex items-center justify-center shadow-xs">
-                  <Search className="w-5 h-5 text-ink-muted" />
-                </div>
-                <span className="mt-1.5 font-mono text-[11px] font-medium text-ink">
-                  2. Reading Desk
-                </span>
+              <div className="flex items-center gap-1 font-mono text-[11px]">
+                <Camera className="w-3.5 h-3.5 text-ink-muted mr-1" />
+                {(['iso', 'front', 'desk'] as CameraPreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCameraPreset((c) => ({ seq: c.seq + 1, preset }))}
+                    className="px-2 py-0.5 rounded border border-rule bg-ivory hover:bg-mint-soft text-ink capitalize transition-colors"
+                  >
+                    {preset}
+                  </button>
+                ))}
               </div>
-
-              <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-xl bg-paper border border-rule flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-5 h-5 text-mint" />
-                </div>
-                <span className="mt-1.5 font-mono text-[11px] font-medium text-ink">
-                  3. Gemini Brain
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <div className="w-11 h-11 rounded-xl bg-paper border border-rule flex items-center justify-center shadow-xs">
-                  <Archive className="w-5 h-5 text-ink" />
-                </div>
-                <span className="mt-1.5 font-mono text-[11px] font-medium text-ink">
-                  4. Filing Cabinet
-                </span>
-              </div>
-            </div>
-
-            {/* Walking Path & Animated Agents */}
-            <div className="relative h-28 mt-2">
-              <div className="absolute left-[10%] right-[10%] bottom-5 h-0.5 bg-rule border-b border-dashed border-ink-muted/30" />
-
-              {(['courier', 'archivist', 'librarian'] as AgentId[]).map((id) => (
-                <div
-                  key={id}
-                  className="absolute bottom-2 -translate-x-1/2 transition-all duration-900 ease-in-out"
-                  style={{ left: `${positions[id]}%` }}
-                >
-                  <AgentSprite
-                    id={id}
-                    walking={walking[id]}
-                    active={activeAgent === id}
-                    bubble={bubbles[id]}
-                  />
-                </div>
-              ))}
             </div>
 
             {pollingError && (
-              <p className="relative text-[11px] font-mono text-terracotta mt-2">
-                Note: Live GitHub polling paused ({pollingError}). Replay still works offline.
+              <p className="text-[11px] font-mono text-terracotta">
+                Note: Live GitHub polling paused ({pollingError}). 3D Replay & Drop Test still work offline.
               </p>
             )}
           </div>
 
           {/* Chronological Agent Trace */}
           <div>
-            <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center justify-between mb-2">
               <h3 className="font-mono text-xs uppercase tracking-wider text-ink-muted">
                 Recent Gemini Activity Log
               </h3>
@@ -559,14 +466,34 @@ export function AgentRoomModal({
             </div>
 
             {!agentLog?.events?.length ? (
-              <div className="bg-paper border border-rule rounded-xl p-6 text-center text-sm text-ink-muted">
-                No AI sorting log recorded yet. Push a file or click{' '}
-                <strong className="text-ink">Replay</strong> to see the agents in action!
+              <div className="bg-paper border border-rule rounded-xl p-5 text-center text-sm text-ink-muted">
+                No AI sorting log recorded yet. Click{' '}
+                <strong className="text-ink">Drop Test</strong> or{' '}
+                <strong className="text-ink">Replay Log</strong> to watch the 3D agents!
               </div>
             ) : (
               <div className="bg-paper border border-rule rounded-xl divide-y divide-rule overflow-hidden">
                 {agentLog.events.map((ev, idx) => (
-                  <div key={`${ev.file}-${idx}`} className="px-4 py-3 text-sm flex items-start gap-3">
+                  <div
+                    key={`${ev.file}-${idx}`}
+                    className="px-4 py-2.5 text-sm flex items-start gap-3 hover:bg-ivory/50 cursor-pointer transition-colors"
+                    onClick={() =>
+                      setDropBatch({
+                        seq: Date.now(),
+                        jobs: [
+                          {
+                            id: `pick-${idx}-${Date.now()}`,
+                            filename: ev.file,
+                            title: ev.title,
+                            folder: ev.folder,
+                            tags: ev.tags,
+                            reason: ev.reason,
+                          },
+                        ],
+                      })
+                    }
+                    title="Click to animate this file in 3D"
+                  >
                     <CheckCircle2 className="w-4 h-4 text-mint shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -585,7 +512,7 @@ export function AgentRoomModal({
                         {ev.reason ? ` — ${ev.reason}` : ''}
                       </p>
                       {ev.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {ev.tags.map((t) => (
                             <span
                               key={t}

@@ -1,64 +1,8 @@
 {
-  "runAt": "2026-11-14T10:29:38.409Z",
-  "durationMs": 210989,
-  "processedCount": 5,
+  "runAt": "2026-11-14T10:56:59.977Z",
+  "durationMs": 1203,
+  "processedCount": 1,
   "events": [
-    {
-      "file": "ADCBMIC.pdf",
-      "title": "ADC and BMIC Overview",
-      "source": "inbox",
-      "folder": "Electrical Engineering",
-      "tags": [
-        "lecture-notes",
-        "electronics",
-        "hardware"
-      ],
-      "reason": "The filename refers to key integrated circuit components, making Electrical Engineering the most appropriate course folder.",
-      "durationMs": 49887,
-      "at": "2026-11-14T10:26:57.310Z"
-    },
-    {
-      "file": "ADC_RF.pdf",
-      "title": "Analog-to-Digital Converters and Radio Frequency",
-      "source": "inbox",
-      "folder": "Electrical Engineering",
-      "tags": [
-        "electronics",
-        "hardware",
-        "lecture-notes"
-      ],
-      "reason": "The content directly pertains to core electrical engineering hardware and electronics topics, fitting neatly into the existing department folder.",
-      "durationMs": 8621,
-      "at": "2026-11-14T10:27:05.932Z"
-    },
-    {
-      "file": "DC_DC.pdf",
-      "title": "DC-DC Converters",
-      "source": "inbox",
-      "folder": "Electrical Engineering",
-      "tags": [
-        "electronics",
-        "hardware",
-        "lecture-notes"
-      ],
-      "reason": "Placed in the existing Electrical Engineering folder and tagged with existing electronics terms since DC-DC converters are fundamental power electronics circuits.",
-      "durationMs": 5862,
-      "at": "2026-11-14T10:27:11.795Z"
-    },
-    {
-      "file": "LDO.pdf",
-      "title": "Low-Dropout Regulators (LDO)",
-      "source": "inbox",
-      "folder": "Electrical Engineering",
-      "tags": [
-        "electronics",
-        "hardware",
-        "lecture-notes"
-      ],
-      "reason": "LDO regulators are standard power management components in electrical engineering, aligning directly with the existing subject folder and electronics tags.",
-      "durationMs": 136720,
-      "at": "2026-11-14T10:29:28.515Z"
-    },
     {
       "file": "PLL.pdf",
       "title": "PLL",
@@ -66,8 +10,8 @@
       "folder": "Unsorted",
       "tags": [],
       "reason": "Fallback sort (no AI response)",
-      "durationMs": 9892,
-      "at": "2026-11-14T10:29:38.408Z"
+      "durationMs": 1122,
+      "at": "2026-11-14T10:56:59.899Z"
     }
   ]
 }

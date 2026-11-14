@@ -1,3 +1,19 @@
 ﻿node_modules
 dist
 .DS_Store
+Add-Content -Path .gitignore -Encoding utf8 -Value @'
+
+# LaTeX build junk
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.toc
+*.out
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+'@

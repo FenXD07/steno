@@ -1,6 +1,54 @@
 {
-  "generatedAt": "2026-11-14T10:03:25.960Z",
+  "generatedAt": "2026-11-14T10:09:05.823Z",
   "documents": [
+    {
+      "id": "documents/Unsorted/PLL.pdf",
+      "path": "documents/Unsorted/PLL.pdf",
+      "filename": "PLL.pdf",
+      "folder": "Unsorted",
+      "title": "PLL",
+      "tags": [],
+      "summary": "",
+      "ext": "pdf",
+      "size": 28932268,
+      "addedAt": "2026-11-14T10:09:00.357Z"
+    },
+    {
+      "id": "documents/Unsorted/LDO.pdf",
+      "path": "documents/Unsorted/LDO.pdf",
+      "filename": "LDO.pdf",
+      "folder": "Unsorted",
+      "title": "LDO",
+      "tags": [],
+      "summary": "",
+      "ext": "pdf",
+      "size": 29028007,
+      "addedAt": "2026-11-14T10:09:00.234Z"
+    },
+    {
+      "id": "documents/Unsorted/DC_DC.pdf",
+      "path": "documents/Unsorted/DC_DC.pdf",
+      "filename": "DC_DC.pdf",
+      "folder": "Unsorted",
+      "title": "DC DC",
+      "tags": [],
+      "summary": "",
+      "ext": "pdf",
+      "size": 40255376,
+      "addedAt": "2026-11-14T10:09:00.110Z"
+    },
+    {
+      "id": "documents/Unsorted/ADCBMIC.pdf",
+      "path": "documents/Unsorted/ADCBMIC.pdf",
+      "filename": "ADCBMIC.pdf",
+      "folder": "Unsorted",
+      "title": "ADCBMIC",
+      "tags": [],
+      "summary": "",
+      "ext": "pdf",
+      "size": 33985784,
+      "addedAt": "2026-11-14T10:08:59.943Z"
+    },
     {
       "id": "documents/Unsorted/ADC_RF.pdf",
       "path": "documents/Unsorted/ADC_RF.pdf",

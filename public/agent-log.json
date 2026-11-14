@@ -1,6 +1,47 @@
 {
-  "runAt": "",
-  "durationMs": 0,
-  "processedCount": 0,
-  "events": []
+  "runAt": "2026-11-14T10:09:05.823Z",
+  "durationMs": 671,
+  "processedCount": 4,
+  "events": [
+    {
+      "file": "ADCBMIC.pdf",
+      "title": "ADCBMIC",
+      "source": "inbox",
+      "folder": "Unsorted",
+      "tags": [],
+      "reason": "Fallback sort (no AI response)",
+      "durationMs": 404,
+      "at": "2026-11-14T10:09:05.557Z"
+    },
+    {
+      "file": "DC_DC.pdf",
+      "title": "DC DC",
+      "source": "inbox",
+      "folder": "Unsorted",
+      "tags": [],
+      "reason": "Fallback sort (no AI response)",
+      "durationMs": 96,
+      "at": "2026-11-14T10:09:05.653Z"
+    },
+    {
+      "file": "LDO.pdf",
+      "title": "LDO",
+      "source": "inbox",
+      "folder": "Unsorted",
+      "tags": [],
+      "reason": "Fallback sort (no AI response)",
+      "durationMs": 79,
+      "at": "2026-11-14T10:09:05.732Z"
+    },
+    {
+      "file": "PLL.pdf",
+      "title": "PLL",
+      "source": "inbox",
+      "folder": "Unsorted",
+      "tags": [],
+      "reason": "Fallback sort (no AI response)",
+      "durationMs": 90,
+      "at": "2026-11-14T10:09:05.822Z"
+    }
+  ]
 }

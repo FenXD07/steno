@@ -9,7 +9,7 @@ const MANIFEST_PATH = path.join(ROOT, 'public', 'manifest.json');
 const AGENT_LOG_PATH = path.join(ROOT, 'public', 'agent-log.json');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 const MIME_MAP = {
   '.pdf': 'application/pdf',
@@ -183,7 +183,6 @@ Return ONLY valid JSON matching:
         contents: [{ parts }],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.2,
         },
       }),
     });
@@ -252,6 +251,17 @@ async function main() {
     (existingManifest.documents || []).map((doc) => [doc.path, doc])
   );
 
+  // Retry prior fallback documents now that Gemini has a supported model.
+  const fallbackMetaPaths = new Set(
+    (existingManifest.documents || [])
+      .filter((doc) =>
+        doc.folder === 'Unsorted' &&
+        !(doc.tags || []).length &&
+        !String(doc.summary || '').trim()
+      )
+      .map((doc) => doc.path)
+  );
+
   const existingFolders = listFolders(DOCS_DIR);
   const existingTagsSet = new Set();
   for (const doc of existingManifest.documents || []) {
@@ -261,6 +271,18 @@ async function main() {
   const runEvents = [];
 
   // 1. Process new files in inbox/
+  // Requeue files that were previously indexed in Unsorted without AI metadata.
+  const fallbackItems = walkFiles(DOCS_DIR).filter((item) =>
+    fallbackMetaPaths.has(`documents/${item.relPath}`)
+  );
+  for (const item of fallbackItems) {
+    const filename = path.basename(item.fullPath);
+    const retryPath = getUniqueDestPath(INBOX_DIR, filename);
+    fs.renameSync(item.fullPath, retryPath);
+    removeEmptyDirs(path.dirname(item.fullPath), DOCS_DIR);
+    console.log(`Requeued previous fallback file: ${filename}`);
+  }
+
   const inboxFiles = walkFiles(INBOX_DIR);
   const newlySortedMeta = new Map();
 

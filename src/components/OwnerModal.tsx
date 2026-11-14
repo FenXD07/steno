@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  CheckCircle2,
   AlertCircle,
+  CheckCircle2,
   Loader2,
   Lock,
   LogOut,
@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import type { OwnerConfig } from '../types';
+import { formatBytes } from '../utils/format';
 
 interface OwnerModalProps {
   open: boolean;
@@ -19,9 +20,12 @@ interface OwnerModalProps {
 
 interface UploadItem {
   name: string;
+  size: number;
   status: 'pending' | 'uploading' | 'done' | 'error';
   message?: string;
 }
+
+const MAX_BROWSER_BYTES = 95 * 1024 * 1024; // 95 MB (GitHub max is 100 MB)
 
 function guessGitHubRepo(): { owner: string; repo: string } {
   const host = window.location.hostname;
@@ -64,6 +68,8 @@ export function OwnerModal({
   const [dragging, setDragging] = useState(false);
   const [queue, setQueue] = useState<UploadItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [commitStatus, setCommitStatus] = useState('');
+  const [commitError, setCommitError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,67 +139,62 @@ export function OwnerModal({
     if (list.length === 0) return;
 
     setUploading(true);
-    setQueue(list.map((f) => ({ name: f.name, status: 'pending' })));
+    setCommitStatus('');
+    setCommitError('');
+    setQueue(list.map((f) => ({ name: f.name, size: f.size, status: 'pending' })));
 
+    const apiBase = `https://api.github.com/repos/${encodeURIComponent(
+      ownerConfig.owner
+    )}/${encodeURIComponent(ownerConfig.repo)}`;
+    const headers = {
+      Authorization: `Bearer ${ownerConfig.token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    };
+
+    const uploadedBlobs: Array<{ idx: number; path: string; sha: string }> = [];
+
+    // 1. Upload each file as a Git Blob (supports up to ~95 MB)
     for (let i = 0; i < list.length; i++) {
       const file = list[i];
       setQueue((prev) =>
-        prev.map((item, idx) => (idx === i ? { ...item, status: 'uploading' } : item))
+        prev.map((item, idx) =>
+          idx === i ? { ...item, status: 'uploading', message: 'Uploading to GitHub…' } : item
+        )
       );
 
       try {
-        if (file.size > 25 * 1024 * 1024) {
-          throw new Error('File exceeds 25 MB browser upload limit. Push via Git instead.');
+        if (file.size > MAX_BROWSER_BYTES) {
+          throw new Error('Exceeds 95 MB limit (GitHub max per file is 100 MB).');
         }
 
         const base64 = await fileToBase64(file);
-        const safeName = file.name.replace(/[/\\]/g, '_');
-        const apiUrl = `https://api.github.com/repos/${encodeURIComponent(
-          ownerConfig.owner
-        )}/${encodeURIComponent(ownerConfig.repo)}/contents/inbox/${encodeURIComponent(safeName)}`;
-
-        // Check if file already exists in inbox/ to include sha if needed
-        let existingSha: string | undefined;
-        const headRes = await fetch(
-          `${apiUrl}?ref=${encodeURIComponent(ownerConfig.branch)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${ownerConfig.token}`,
-              Accept: 'application/vnd.github+json',
-            },
-          }
-        );
-        if (headRes.ok) {
-          const existing = await headRes.json();
-          existingSha = existing.sha;
-        }
-
-        const putRes = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${ownerConfig.token}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json',
-          },
+        const blobRes = await fetch(`${apiBase}/git/blobs`, {
+          method: 'POST',
+          headers,
           body: JSON.stringify({
-            message: `inbox: add ${safeName} via Steno`,
             content: base64,
-            branch: ownerConfig.branch,
-            ...(existingSha ? { sha: existingSha } : {}),
+            encoding: 'base64',
           }),
         });
 
-        if (!putRes.ok) {
-          const errBody = await putRes.json().catch(() => ({}));
-          throw new Error(errBody.message || `Upload failed (HTTP ${putRes.status})`);
+        if (!blobRes.ok) {
+          const errBody = await blobRes.json().catch(() => ({}));
+          throw new Error(errBody.message || `Blob upload failed (HTTP ${blobRes.status})`);
         }
+
+        const blobData = await blobRes.json();
+        const safeName = file.name.replace(/[/\\]/g, '_');
+        uploadedBlobs.push({
+          idx: i,
+          path: `inbox/${safeName}`,
+          sha: blobData.sha,
+        });
 
         setQueue((prev) =>
           prev.map((item, idx) =>
-            idx === i
-              ? { ...item, status: 'done', message: 'Sent to inbox/ for Gemini sorting' }
-              : item
+            idx === i ? { ...item, status: 'uploading', message: 'Uploaded — waiting to commit…' } : item
           )
         );
       } catch (err) {
@@ -206,6 +207,87 @@ export function OwnerModal({
                   message: err instanceof Error ? err.message : 'Upload failed',
                 }
               : item
+          )
+        );
+      }
+    }
+
+    // 2. Commit all uploaded blobs in one single commit
+    if (uploadedBlobs.length > 0) {
+      setCommitStatus(`Committing ${uploadedBlobs.length} file(s) to inbox/…`);
+      try {
+        const refRes = await fetch(
+          `${apiBase}/git/ref/heads/${encodeURIComponent(ownerConfig.branch)}`,
+          { headers }
+        );
+        if (!refRes.ok) throw new Error(`Could not read branch "${ownerConfig.branch}"`);
+        const refData = await refRes.json();
+        const latestCommitSha: string = refData.object.sha;
+
+        const commitRes = await fetch(`${apiBase}/git/commits/${latestCommitSha}`, { headers });
+        if (!commitRes.ok) throw new Error('Could not read latest commit');
+        const commitData = await commitRes.json();
+        const baseTreeSha: string = commitData.tree.sha;
+
+        const treeRes = await fetch(`${apiBase}/git/trees`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            base_tree: baseTreeSha,
+            tree: uploadedBlobs.map((b) => ({
+              path: b.path,
+              mode: '100644',
+              type: 'blob',
+              sha: b.sha,
+            })),
+          }),
+        });
+        if (!treeRes.ok) throw new Error('Failed to create Git tree');
+        const treeData = await treeRes.json();
+
+        const newCommitRes = await fetch(`${apiBase}/git/commits`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            message: `inbox: add ${uploadedBlobs.length} document(s) via Steno`,
+            tree: treeData.sha,
+            parents: [latestCommitSha],
+          }),
+        });
+        if (!newCommitRes.ok) throw new Error('Failed to create Git commit');
+        const newCommitData = await newCommitRes.json();
+
+        const updateRefRes = await fetch(
+          `${apiBase}/git/refs/heads/${encodeURIComponent(ownerConfig.branch)}`,
+          {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ sha: newCommitData.sha }),
+          }
+        );
+        if (!updateRefRes.ok) {
+          throw new Error('Branch updated while uploading—please retry once.');
+        }
+
+        const successIndexes = new Set(uploadedBlobs.map((b) => b.idx));
+        setQueue((prev) =>
+          prev.map((item, idx) =>
+            successIndexes.has(idx)
+              ? { ...item, status: 'done', message: 'Sent to inbox/ for Gemini sorting' }
+              : item
+          )
+        );
+        setCommitStatus(
+          `Committed ${uploadedBlobs.length} file(s)! Open the Agents room to watch Gemini sort them live.`
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Commit failed';
+        setCommitError(msg);
+        setCommitStatus('');
+        const failedIndexes = new Set(uploadedBlobs.map((b) => b.idx));
+        setQueue((prev) =>
+          prev.map((item, idx) =>
+            failedIndexes.has(idx) ? { ...item, status: 'error', message: msg } : item
           )
         );
       }
@@ -356,19 +438,24 @@ export function OwnerModal({
                   Drop study files here, or click to browse
                 </p>
                 <p className="text-xs text-ink-muted mt-1">
-                  PDFs, images, Markdown, Word, PowerPoint, code, or zips (up to 25 MB)
+                  PDFs, images, Markdown, Word, PowerPoint, code, or zips (up to 95 MB each)
                 </p>
               </div>
 
               {queue.length > 0 && (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-52 overflow-y-auto">
                   {queue.map((item, idx) => (
                     <div
                       key={`${item.name}-${idx}`}
                       className="flex items-center justify-between gap-3 bg-ivory border border-rule rounded-lg px-3 py-2 text-xs"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-ink truncate">{item.name}</p>
+                        <p className="font-medium text-ink truncate">
+                          {item.name}{' '}
+                          <span className="font-mono text-[11px] text-ink-muted font-normal">
+                            ({formatBytes(item.size)})
+                          </span>
+                        </p>
                         {item.message && (
                           <p
                             className={`mt-0.5 ${
@@ -390,12 +477,19 @@ export function OwnerModal({
                       )}
                     </div>
                   ))}
-                  {!uploading && queue.some((q) => q.status === 'done') && (
-                    <p className="text-[11px] font-mono text-ink-muted pt-1">
-                      GitHub Actions + Gemini are sorting your files now. Refresh in ~45 seconds to see them appear.
-                    </p>
-                  )}
                 </div>
+              )}
+
+              {commitStatus && (
+                <p className="text-[11px] font-mono text-ink bg-mint-soft border border-mint/40 rounded-lg px-3 py-2">
+                  {commitStatus}
+                </p>
+              )}
+
+              {commitError && (
+                <p className="text-[11px] font-mono text-terracotta bg-terracotta-soft border border-terracotta/30 rounded-lg px-3 py-2">
+                  {commitError}
+                </p>
               )}
 
               <div className="pt-2 border-t border-rule flex items-center justify-between">
@@ -408,6 +502,8 @@ export function OwnerModal({
                     onSaveConfig(null);
                     setToken('');
                     setQueue([]);
+                    setCommitStatus('');
+                    setCommitError('');
                   }}
                   className="inline-flex items-center gap-1 text-xs text-terracotta hover:underline"
                 >
